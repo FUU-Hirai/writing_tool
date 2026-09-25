@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+      POSTGRES_DB: ${POSTGRES_DB:-article_studio}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studio} -d ${POSTGRES_DB:-article_studio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-120}
+      OPENAI_MAX_TOKENS: ${OPENAI_MAX_TOKENS:-12000}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-studio}:${POSTGRES_PASSWORD:-studio}@postgres:5432/${POSTGRES_DB:-article_studio}
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      INTERNAL_API_URL: http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
